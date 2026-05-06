@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: 1920px; height: 1080px;
+    overflow: hidden; background: #1a1a2e;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    color: #e0e0e0;
+  }
+  #screen-share {
+    width: 100%; height: 100%;
+    object-fit: contain; background: #000;
+    display: none;
+  }
+  #fallback {
+    width: 100%; height: 100%;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 24px;
+  }
+  .rec-badge {
+    position: fixed; bottom: 20px; left: 20px;
+    background: rgba(0,0,0,0.6); padding: 8px 16px;
+    border-radius: 8px; font-size: 16px;
+    display: flex; align-items: center; gap: 8px;
+    z-index: 100;
+    transition: opacity 0.3s;
+  }
+  .rec-dot {
+    width: 12px; height: 12px;
+    background: #e53935; border-radius: 50%;
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  .timer { font-size: 64px; font-weight: 300; letter-spacing: 4px; }
+  .status { font-size: 24px; opacity: 0.6; }
+  .participants { font-size: 18px; opacity: 0.5; margin-top: 8px; }
+  .presenter { font-size: 14px; opacity: 0.8; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+  <video id="screen-share" autoplay playsinline></video>
+
+  <div id="fallback">
+    <div class="timer" id="timer">00:00:00</div>
+    <div class="status">Ожидание демонстрации экрана...</div>
+    <div class="participants" id="participants"></div>
+  </div>
+
+  <div class="rec-badge">
+    <div class="rec-dot"></div>
+    <span>REC</span>
+    <span id="badge-timer">00:00:00</span>
+    <span class="presenter" id="presenter"></span>
+  </div>
+
+  <script src="https://unpkg.com/livekit-client/dist/livekit-client.umd.js"></script>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const wsUrl = params.get('url');
+    const token = params.get('token');
+
+    const videoEl = document.getElementById('screen-share');
+    const fallbackEl = document.getElementById('fallback');
+    const timerEl = document.getElementById('timer');
+    const badgeTimerEl = document.getElementById('badge-timer');
+    const participantsEl = document.getElementById('participants');
+    const presenterEl = document.getElementById('presenter');
+
+    const startTime = Date.now();
+    let activeScreenTrack = null;
+    const screenTracks = new Map();
+
+    function formatTime(ms) {
+      const s = Math.floor(ms / 1000);
+      const h = String(Math.floor(s / 3600)).padStart(2, '0');
+      const m = String(Math.floor((s % 3600) / 60)).padStart(2, '0');
+      const sec = String(s % 60).padStart(2, '0');
+      return `${h}:${m}:${sec}`;
+    }
+
+    setInterval(() => {
+      const elapsed = formatTime(Date.now() - startTime);
+      timerEl.textContent = elapsed;
+      badgeTimerEl.textContent = elapsed;
+    }, 1000);
+
+    function updateParticipants(room) {
+      const names = [];
+      room.remoteParticipants.forEach(p => {
+        names.push(p.identity || p.sid);
+      });
+      participantsEl.textContent = names.length
+        ? 'Участники: ' + names.join(', ')
+        : '';
+    }
+
+    function showScreenShare(track, identity) {
+      track.attach(videoEl);
+      videoEl.style.display = 'block';
+      fallbackEl.classList.add('hidden');
+      presenterEl.textContent = '— ' + identity;
+    }
+
+    function hideScreenShare() {
+      videoEl.style.display = 'none';
+      videoEl.srcObject = null;
+      fallbackEl.classList.remove('hidden');
+      presenterEl.textContent = '';
+    }
+
+    function pickBestScreen() {
+      if (screenTracks.size === 0) {
+        hideScreenShare();
+        return;
+      }
+      const [identity, track] = [...screenTracks.entries()].pop();
+      activeScreenTrack = track;
+      showScreenShare(track, identity);
+    }
+
+    async function main() {
+      const room = new LivekitClient.Room();
+      await room.connect(wsUrl, token);
+
+      updateParticipants(room);
+
+      room.on(LivekitClient.RoomEvent.TrackSubscribed, (track, pub, participant) => {
+        if (track.source === LivekitClient.Track.Source.ScreenShare && track.kind === LivekitClient.Track.Kind.Video) {
+          screenTracks.set(participant.identity, track);
+          pickBestScreen();
+        }
+      });
+
+      room.on(LivekitClient.RoomEvent.TrackUnsubscribed, (track, pub, participant) => {
+        if (screenTracks.has(participant.identity) && screenTracks.get(participant.identity) === track) {
+          screenTracks.delete(participant.identity);
+          pickBestScreen();
+        }
+      });
+
+      room.on(LivekitClient.RoomEvent.ParticipantConnected, () => updateParticipants(room));
+      room.on(LivekitClient.RoomEvent.ParticipantDisconnected, () => updateParticipants(room));
+    }
+
+    main().catch(console.error);
+  </script>
+</body>
+</html>
