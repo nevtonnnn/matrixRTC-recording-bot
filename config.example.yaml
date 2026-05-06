@@ -1,0 +1,21 @@
+matrix:
+  homeserver: https://derevnia-durakov.ru
+  user_id: "@recording-bot:derevnia-durakov.ru"
+  access_token: "syt_..."
+
+livekit:
+  url: https://derevnia-durakov.ru
+  api_key: "your-api-key"
+  api_secret: "your-api-secret"
+
+recording:
+  output_dir: /recordings
+  default_mode: screen
+
+webhook:
+  listen: ":8080"
+  path: /webhook
+
+layouts:
+  listen: ":8080"
+  path: /layouts/
