@@ -1,9 +1,14 @@
 package matrix
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
+	"net/http"
 	"strings"
 
 	"maunium.net/go/mautrix"
@@ -32,6 +37,10 @@ func NewClient(cfg *config.Config, manager *recorder.Manager, log *slog.Logger) 
 func (c *Client) Run(ctx context.Context) error {
 	syncer := c.mx.Syncer.(*mautrix.DefaultSyncer)
 
+	syncer.OnEvent(func(ctx context.Context, evt *event.Event) {
+		c.log.Debug("sync event", "type", evt.Type.Type, "room", evt.RoomID, "sender", evt.Sender)
+	})
+
 	syncer.OnEventType(event.EventMessage, func(ctx context.Context, evt *event.Event) {
 		c.handleMessage(ctx, evt)
 	})
@@ -52,8 +61,15 @@ func (c *Client) Run(ctx context.Context) error {
 }
 
 func (c *Client) handleMessage(ctx context.Context, evt *event.Event) {
-	body := evt.Content.AsMessage().Body
+	msg := evt.Content.AsMessage()
+	if msg == nil {
+		c.log.Warn("nil message content", "room", evt.RoomID, "sender", evt.Sender, "type", evt.Type.Type)
+		return
+	}
+	body := msg.Body
 	sender := evt.Sender
+
+	c.log.Info("message received", "room", evt.RoomID, "sender", sender, "body", body)
 
 	if sender == id.UserID(c.cfg.Matrix.UserID) {
 		return
@@ -126,25 +142,144 @@ func (c *Client) SendEgressEnded(egressID string) {
 }
 
 func (c *Client) getLiveKitRoomName(ctx context.Context, roomID id.RoomID) (string, error) {
-	stateMap, err := c.mx.State(ctx, roomID)
-	if err != nil {
-		return "", fmt.Errorf("getting room state: %w", err)
+	if !c.hasActiveCall(ctx, roomID) {
+		return "", fmt.Errorf("no active call found in room")
 	}
 
-	// RoomStateMap is map[event.Type]map[string]*event.Event
-	// Look for MatrixRTC call.member state events
+	livekitRoom, err := c.resolveRoomViaJWTService(ctx, roomID)
+	if err != nil {
+		return "", fmt.Errorf("resolving livekit room: %w", err)
+	}
+	return livekitRoom, nil
+}
+
+func (c *Client) hasActiveCall(ctx context.Context, roomID id.RoomID) bool {
+	stateMap, err := c.mx.State(ctx, roomID)
+	if err != nil {
+		return false
+	}
 	for evtType, stateKeys := range stateMap {
-		if evtType.Type == "org.matrix.msc3401.call.member" || evtType.Type == "m.call.member" {
-			for _, evt := range stateKeys {
-				if evt.Content.Raw != nil {
-					// Element Call uses the Matrix room ID as the LiveKit room name
-					return string(roomID), nil
-				}
+		if evtType.Type != "org.matrix.msc3401.call.member" && evtType.Type != "m.call.member" {
+			continue
+		}
+		for _, evt := range stateKeys {
+			if evt.Content.Raw == nil {
+				continue
+			}
+			raw, _ := json.Marshal(evt.Content.Raw)
+			var content struct {
+				FociPreferred []struct {
+					Type string `json:"type"`
+				} `json:"foci_preferred"`
+			}
+			if json.Unmarshal(raw, &content) == nil && len(content.FociPreferred) > 0 {
+				return true
 			}
 		}
 	}
+	return false
+}
 
-	return "", fmt.Errorf("no active call found in room")
+func (c *Client) resolveRoomViaJWTService(ctx context.Context, roomID id.RoomID) (string, error) {
+	openIDToken, err := c.getOpenIDToken(ctx)
+	if err != nil {
+		return "", fmt.Errorf("getting openid token: %w", err)
+	}
+
+	reqBody, _ := json.Marshal(map[string]interface{}{
+		"room":      string(roomID),
+		"device_id": "RECORDING_BOT",
+		"openid_token": map[string]interface{}{
+			"access_token":     openIDToken.AccessToken,
+			"token_type":       openIDToken.TokenType,
+			"matrix_server_name": openIDToken.MatrixServerName,
+			"expires_in":       openIDToken.ExpiresIn,
+		},
+	})
+
+	jwtURL := c.cfg.LiveKit.JWTServiceURL + "/sfu/get"
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, jwtURL, bytes.NewReader(reqBody))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("calling jwt service: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("jwt service returned %d: %s", resp.StatusCode, string(body))
+	}
+
+	var sfuResp struct {
+		JWT string `json:"jwt"`
+	}
+	if err := json.Unmarshal(body, &sfuResp); err != nil {
+		return "", fmt.Errorf("parsing jwt service response: %w", err)
+	}
+
+	return extractRoomFromJWT(sfuResp.JWT)
+}
+
+type openIDToken struct {
+	AccessToken      string `json:"access_token"`
+	TokenType        string `json:"token_type"`
+	MatrixServerName string `json:"matrix_server_name"`
+	ExpiresIn        int    `json:"expires_in"`
+}
+
+func (c *Client) getOpenIDToken(ctx context.Context) (*openIDToken, error) {
+	url := c.cfg.Matrix.Homeserver + "/_matrix/client/v3/user/" + c.cfg.Matrix.UserID + "/openid/request_token"
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader([]byte("{}")))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+c.cfg.Matrix.AccessToken)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("openid request failed %d: %s", resp.StatusCode, string(body))
+	}
+
+	var token openIDToken
+	if err := json.Unmarshal(body, &token); err != nil {
+		return nil, err
+	}
+	return &token, nil
+}
+
+func extractRoomFromJWT(token string) (string, error) {
+	parts := strings.Split(token, ".")
+	if len(parts) != 3 {
+		return "", fmt.Errorf("invalid JWT format")
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return "", fmt.Errorf("decoding JWT payload: %w", err)
+	}
+	var claims struct {
+		Video struct {
+			Room string `json:"room"`
+		} `json:"video"`
+	}
+	if err := json.Unmarshal(payload, &claims); err != nil {
+		return "", fmt.Errorf("parsing JWT claims: %w", err)
+	}
+	if claims.Video.Room == "" {
+		return "", fmt.Errorf("no room in JWT claims")
+	}
+	return claims.Video.Room, nil
 }
 
 func (c *Client) sendText(ctx context.Context, roomID id.RoomID, text string) {

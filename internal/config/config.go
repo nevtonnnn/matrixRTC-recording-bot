@@ -22,9 +22,10 @@ type MatrixConfig struct {
 }
 
 type LiveKitConfig struct {
-	URL       string `yaml:"url"`
-	APIKey    string `yaml:"api_key"`
-	APISecret string `yaml:"api_secret"`
+	URL           string `yaml:"url"`
+	APIKey        string `yaml:"api_key"`
+	APISecret     string `yaml:"api_secret"`
+	JWTServiceURL string `yaml:"jwt_service_url"`
 }
 
 type RecordingConfig struct {
