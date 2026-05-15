@@ -34,7 +34,7 @@ func NewClient(ctx context.Context, cfg *config.Config, manager *recorder.Manage
 		return nil, fmt.Errorf("creating matrix client: %w", err)
 	}
 
-	helper, err := cryptohelper.NewCryptoHelper(mx, []byte(cfg.Matrix.PickleKey), "/data/crypto.db")
+	helper, err := cryptohelper.NewCryptoHelper(mx, []byte(cfg.Matrix.PickleKey), "/config/crypto.db")
 	if err != nil {
 		return nil, fmt.Errorf("creating crypto helper: %w", err)
 	}
