@@ -1,7 +1,8 @@
 matrix:
   homeserver: https://derevnia-durakov.ru
   user_id: "@recording-bot:derevnia-durakov.ru"
-  access_token: "syt_..."
+  password: "bot-password"
+  pickle_key: "random-secret-string"
 
 livekit:
   url: https://derevnia-durakov.ru

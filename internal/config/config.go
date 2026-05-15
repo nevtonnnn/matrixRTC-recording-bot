@@ -16,9 +16,10 @@ type Config struct {
 }
 
 type MatrixConfig struct {
-	Homeserver  string `yaml:"homeserver"`
-	UserID      string `yaml:"user_id"`
-	AccessToken string `yaml:"access_token"`
+	Homeserver string `yaml:"homeserver"`
+	UserID     string `yaml:"user_id"`
+	Password   string `yaml:"password"`
+	PickleKey  string `yaml:"pickle_key"`
 }
 
 type LiveKitConfig struct {
