@@ -43,14 +43,15 @@ func main() {
 
 	mgr := recorder.NewManager(lkClient, log)
 
-	mxClient, err := matrix.NewClient(cfg, mgr, log)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	mxClient, err := matrix.NewClient(ctx, cfg, mgr, log)
 	if err != nil {
 		log.Error("failed to create matrix client", "error", err)
 		os.Exit(1)
 	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	defer mxClient.Close()
 
 	if err := mgr.RestoreFromEgress(ctx); err != nil {
 		log.Warn("failed to restore sessions from egress", "error", err)
