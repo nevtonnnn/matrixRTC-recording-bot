@@ -8,18 +8,23 @@ import (
 	"time"
 )
 
+var ErrNoRecording = fmt.Errorf("no active recording in this room")
+var ErrAlreadyStopped = fmt.Errorf("recording already stopped")
+
 type Manager struct {
-	mu       sync.Mutex
-	sessions map[string]*Session // key: Matrix room ID
-	lk       *LiveKitClient
-	log      *slog.Logger
+	mu              sync.Mutex
+	sessions        map[string]*Session // key: Matrix room ID
+	recentlyStopped map[string]time.Time
+	lk              *LiveKitClient
+	log             *slog.Logger
 }
 
 func NewManager(lk *LiveKitClient, log *slog.Logger) *Manager {
 	return &Manager{
-		sessions: make(map[string]*Session),
-		lk:       lk,
-		log:      log,
+		sessions:        make(map[string]*Session),
+		recentlyStopped: make(map[string]time.Time),
+		lk:              lk,
+		log:             log,
 	}
 }
 
@@ -60,7 +65,10 @@ func (m *Manager) StopRecording(ctx context.Context, matrixRoomID string) (*Sess
 
 	session, exists := m.sessions[matrixRoomID]
 	if !exists {
-		return nil, fmt.Errorf("no active recording in this room")
+		if t, ok := m.recentlyStopped[matrixRoomID]; ok && time.Since(t) < 60*time.Second {
+			return nil, ErrAlreadyStopped
+		}
+		return nil, ErrNoRecording
 	}
 
 	if err := m.lk.StopRecording(ctx, session.EgressID); err != nil {
@@ -68,6 +76,7 @@ func (m *Manager) StopRecording(ctx context.Context, matrixRoomID string) (*Sess
 	}
 
 	delete(m.sessions, matrixRoomID)
+	m.recentlyStopped[matrixRoomID] = time.Now()
 
 	m.log.Info("recording stopped",
 		"room", matrixRoomID,
@@ -103,6 +112,7 @@ func (m *Manager) HandleEgressEnded(egressID string) *Session {
 	for key, s := range m.sessions {
 		if s.EgressID == egressID {
 			delete(m.sessions, key)
+			m.recentlyStopped[key] = time.Now()
 			m.log.Info("egress ended externally",
 				"room", key,
 				"egress_id", egressID,

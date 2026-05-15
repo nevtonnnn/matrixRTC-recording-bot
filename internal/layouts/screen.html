@@ -92,10 +92,14 @@
       badgeTimerEl.textContent = elapsed;
     }, 1000);
 
+    function displayName(p) {
+      return p.name || p.identity.replace(/@([^:]+):.*/, '$1');
+    }
+
     function updateParticipants(room) {
       const names = [];
       room.remoteParticipants.forEach(p => {
-        names.push(p.identity || p.sid);
+        names.push(displayName(p));
       });
       participantsEl.textContent = names.length
         ? 'Участники: ' + names.join(', ')
@@ -131,17 +135,19 @@
       await room.connect(wsUrl, token);
 
       updateParticipants(room);
+      console.log("START_RECORDING");
 
       room.on(LivekitClient.RoomEvent.TrackSubscribed, (track, pub, participant) => {
         if (track.source === LivekitClient.Track.Source.ScreenShare && track.kind === LivekitClient.Track.Kind.Video) {
-          screenTracks.set(participant.identity, track);
+          screenTracks.set(displayName(participant), track);
           pickBestScreen();
         }
       });
 
       room.on(LivekitClient.RoomEvent.TrackUnsubscribed, (track, pub, participant) => {
-        if (screenTracks.has(participant.identity) && screenTracks.get(participant.identity) === track) {
-          screenTracks.delete(participant.identity);
+        const name = displayName(participant);
+        if (screenTracks.has(name) && screenTracks.get(name) === track) {
+          screenTracks.delete(name);
           pickBestScreen();
         }
       });
@@ -150,7 +156,10 @@
       room.on(LivekitClient.RoomEvent.ParticipantDisconnected, () => updateParticipants(room));
     }
 
-    main().catch(console.error);
+    main().catch(err => {
+      console.error(err);
+      console.log("START_RECORDING");
+    });
   </script>
 </body>
 </html>

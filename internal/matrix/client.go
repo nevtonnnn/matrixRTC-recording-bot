@@ -66,7 +66,7 @@ func (c *Client) handleMessage(ctx context.Context, evt *event.Event) {
 		c.log.Warn("nil message content", "room", evt.RoomID, "sender", evt.Sender, "type", evt.Type.Type)
 		return
 	}
-	body := msg.Body
+	body := strings.TrimSpace(msg.Body)
 	sender := evt.Sender
 
 	c.log.Info("message received", "room", evt.RoomID, "sender", sender, "body", body)
@@ -76,9 +76,9 @@ func (c *Client) handleMessage(ctx context.Context, evt *event.Event) {
 	}
 
 	switch {
-	case strings.HasPrefix(body, "/record-call"):
+	case strings.HasPrefix(body, "!record-call"):
 		c.handleRecordCall(ctx, evt.RoomID, sender, body)
-	case body == "/record-stop":
+	case body == "!record-stop":
 		c.handleRecordStop(ctx, evt.RoomID)
 	}
 }
@@ -118,7 +118,14 @@ func (c *Client) handleRecordCall(ctx context.Context, roomID id.RoomID, sender 
 func (c *Client) handleRecordStop(ctx context.Context, roomID id.RoomID) {
 	session, err := c.manager.StopRecording(ctx, string(roomID))
 	if err != nil {
-		c.sendText(ctx, roomID, fmt.Sprintf("Ошибка остановки записи: %v", err))
+		switch err {
+		case recorder.ErrAlreadyStopped:
+			c.sendText(ctx, roomID, "⏹ Запись уже остановлена автоматически после завершения звонка")
+		case recorder.ErrNoRecording:
+			c.sendText(ctx, roomID, "Нет активной записи в этой комнате")
+		default:
+			c.sendText(ctx, roomID, fmt.Sprintf("Ошибка остановки записи: %v", err))
+		}
 		return
 	}
 	c.sendText(ctx, roomID, fmt.Sprintf("⏹ Запись остановлена. Длительность: %s", session.Duration()))

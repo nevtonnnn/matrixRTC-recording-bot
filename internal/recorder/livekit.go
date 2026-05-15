@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/livekit/protocol/livekit"
@@ -11,16 +12,30 @@ import (
 )
 
 type LiveKitClient struct {
-	egress    *lksdk.EgressClient
-	outputDir string
-	layoutURL string
+	egress         *lksdk.EgressClient
+	outputDir      string
+	layoutURL      string
+	maxVideoHeight int32
 }
 
-func NewLiveKitClient(url, apiKey, apiSecret, outputDir, layoutURL string) *LiveKitClient {
+func NewLiveKitClient(url, apiKey, apiSecret, outputDir, layoutURL string, maxVideoHeight int32) *LiveKitClient {
 	return &LiveKitClient{
-		egress:    lksdk.NewEgressClient(url, apiKey, apiSecret),
-		outputDir: outputDir,
-		layoutURL: layoutURL,
+		egress:         lksdk.NewEgressClient(url, apiKey, apiSecret),
+		outputDir:      outputDir,
+		layoutURL:      layoutURL,
+		maxVideoHeight: maxVideoHeight,
+	}
+}
+
+func (c *LiveKitClient) videoEncoding() *livekit.EncodingOptions {
+	h := c.maxVideoHeight
+	w := h * 16 / 9
+	return &livekit.EncodingOptions{
+		Width:   w,
+		Height:  h,
+		Depth:   24,
+		Framerate: 30,
+		VideoCodec: livekit.VideoCodec_H264_BASELINE,
 	}
 }
 
@@ -30,7 +45,8 @@ func (c *LiveKitClient) outputPath(roomName string, mode Mode) string {
 	if mode == ModeVoice {
 		ext = "ogg"
 	}
-	return filepath.Join(c.outputDir, roomName, fmt.Sprintf("%s.%s", ts, ext))
+	safeName := strings.ReplaceAll(roomName, "/", "_")
+	return filepath.Join(c.outputDir, safeName, fmt.Sprintf("%s.%s", ts, ext))
 }
 
 func (c *LiveKitClient) StartRecording(ctx context.Context, roomName string, mode Mode) (string, error) {
@@ -51,6 +67,7 @@ func (c *LiveKitClient) startFull(ctx context.Context, roomName string) (string,
 	info, err := c.egress.StartRoomCompositeEgress(ctx, &livekit.RoomCompositeEgressRequest{
 		RoomName: roomName,
 		Layout:   "grid",
+		Options:  &livekit.RoomCompositeEgressRequest_Advanced{Advanced: c.videoEncoding()},
 		FileOutputs: []*livekit.EncodedFileOutput{
 			{
 				FileType: livekit.EncodedFileType_MP4,
@@ -69,6 +86,7 @@ func (c *LiveKitClient) startScreen(ctx context.Context, roomName string) (strin
 	info, err := c.egress.StartRoomCompositeEgress(ctx, &livekit.RoomCompositeEgressRequest{
 		RoomName:      roomName,
 		CustomBaseUrl: c.layoutURL,
+		Options:       &livekit.RoomCompositeEgressRequest_Advanced{Advanced: c.videoEncoding()},
 		FileOutputs: []*livekit.EncodedFileOutput{
 			{
 				FileType: livekit.EncodedFileType_MP4,

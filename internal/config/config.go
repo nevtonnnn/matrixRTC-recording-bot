@@ -29,8 +29,9 @@ type LiveKitConfig struct {
 }
 
 type RecordingConfig struct {
-	OutputDir   string `yaml:"output_dir"`
-	DefaultMode string `yaml:"default_mode"`
+	OutputDir      string `yaml:"output_dir"`
+	DefaultMode    string `yaml:"default_mode"`
+	MaxVideoHeight int32  `yaml:"max_video_height"`
 }
 
 type WebhookConfig struct {
@@ -39,8 +40,9 @@ type WebhookConfig struct {
 }
 
 type LayoutsConfig struct {
-	Listen string `yaml:"listen"`
-	Path   string `yaml:"path"`
+	Listen  string `yaml:"listen"`
+	Path    string `yaml:"path"`
+	BaseURL string `yaml:"base_url"`
 }
 
 func Load(path string) (*Config, error) {
@@ -54,6 +56,9 @@ func Load(path string) (*Config, error) {
 	}
 	if cfg.Recording.DefaultMode == "" {
 		cfg.Recording.DefaultMode = "screen"
+	}
+	if cfg.Recording.MaxVideoHeight == 0 {
+		cfg.Recording.MaxVideoHeight = 720
 	}
 	if cfg.Webhook.Listen == "" {
 		cfg.Webhook.Listen = ":8080"

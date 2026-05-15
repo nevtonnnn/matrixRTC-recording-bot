@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -31,7 +30,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	layoutURL := fmt.Sprintf("http://localhost%s%sscreen.html", cfg.Layouts.Listen, cfg.Layouts.Path)
+	layoutURL := cfg.Layouts.BaseURL
 
 	lkClient := recorder.NewLiveKitClient(
 		cfg.LiveKit.URL,
@@ -39,6 +38,7 @@ func main() {
 		cfg.LiveKit.APISecret,
 		cfg.Recording.OutputDir,
 		layoutURL,
+		cfg.Recording.MaxVideoHeight,
 	)
 
 	mgr := recorder.NewManager(lkClient, log)
