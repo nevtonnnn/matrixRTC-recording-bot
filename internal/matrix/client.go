@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"maunium.net/go/mautrix"
+	"maunium.net/go/mautrix/crypto/cryptohelper"
 	"maunium.net/go/mautrix/event"
 	"maunium.net/go/mautrix/id"
 
@@ -20,18 +21,44 @@ import (
 )
 
 type Client struct {
-	mx      *mautrix.Client
-	manager *recorder.Manager
-	cfg     *config.Config
-	log     *slog.Logger
+	mx           *mautrix.Client
+	cryptoHelper *cryptohelper.CryptoHelper
+	manager      *recorder.Manager
+	cfg          *config.Config
+	log          *slog.Logger
 }
 
-func NewClient(cfg *config.Config, manager *recorder.Manager, log *slog.Logger) (*Client, error) {
-	mx, err := mautrix.NewClient(cfg.Matrix.Homeserver, id.UserID(cfg.Matrix.UserID), cfg.Matrix.AccessToken)
+func NewClient(ctx context.Context, cfg *config.Config, manager *recorder.Manager, log *slog.Logger) (*Client, error) {
+	mx, err := mautrix.NewClient(cfg.Matrix.Homeserver, "", "")
 	if err != nil {
 		return nil, fmt.Errorf("creating matrix client: %w", err)
 	}
-	return &Client{mx: mx, manager: manager, cfg: cfg, log: log}, nil
+
+	helper, err := cryptohelper.NewCryptoHelper(mx, []byte(cfg.Matrix.PickleKey), "/data/crypto.db")
+	if err != nil {
+		return nil, fmt.Errorf("creating crypto helper: %w", err)
+	}
+
+	helper.LoginAs = &mautrix.ReqLogin{
+		Type:                     mautrix.AuthTypePassword,
+		Identifier:               mautrix.UserIdentifier{Type: mautrix.IdentifierTypeUser, User: cfg.Matrix.UserID},
+		Password:                 cfg.Matrix.Password,
+		InitialDeviceDisplayName: "Recording Bot",
+	}
+
+	helper.DecryptErrorCallback = func(evt *event.Event, err error) {
+		log.Warn("failed to decrypt event", "room", evt.RoomID, "sender", evt.Sender, "error", err)
+	}
+
+	if err := helper.Init(ctx); err != nil {
+		return nil, fmt.Errorf("initializing crypto: %w", err)
+	}
+
+	return &Client{mx: mx, cryptoHelper: helper, manager: manager, cfg: cfg, log: log}, nil
+}
+
+func (c *Client) Close() error {
+	return c.cryptoHelper.Close()
 }
 
 func (c *Client) Run(ctx context.Context) error {
@@ -246,7 +273,7 @@ func (c *Client) getOpenIDToken(ctx context.Context) (*openIDToken, error) {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+c.cfg.Matrix.AccessToken)
+	req.Header.Set("Authorization", "Bearer "+c.mx.AccessToken)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
