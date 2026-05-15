@@ -138,6 +138,12 @@
       console.log("START_RECORDING");
 
       room.on(LivekitClient.RoomEvent.TrackSubscribed, (track, pub, participant) => {
+        if (track.kind === LivekitClient.Track.Kind.Audio) {
+          const el = track.attach();
+          el.id = 'audio-' + pub.trackSid;
+          el.style.display = 'none';
+          document.body.appendChild(el);
+        }
         if (track.source === LivekitClient.Track.Source.ScreenShare && track.kind === LivekitClient.Track.Kind.Video) {
           screenTracks.set(displayName(participant), track);
           pickBestScreen();
@@ -145,6 +151,8 @@
       });
 
       room.on(LivekitClient.RoomEvent.TrackUnsubscribed, (track, pub, participant) => {
+        const el = document.getElementById('audio-' + pub.trackSid);
+        if (el) { track.detach(el); el.remove(); }
         const name = displayName(participant);
         if (screenTracks.has(name) && screenTracks.get(name) === track) {
           screenTracks.delete(name);
