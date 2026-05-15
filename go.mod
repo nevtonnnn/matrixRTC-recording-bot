@@ -6,6 +6,7 @@ require (
 	github.com/livekit/protocol v1.45.8
 	github.com/livekit/server-sdk-go/v2 v2.16.3
 	gopkg.in/yaml.v3 v3.0.1
+	maunium.net/go/mautrix v0.27.0
 )
 
 require (
@@ -95,5 +96,4 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260427160629-7cedc36a6bc4 // indirect
 	google.golang.org/grpc v1.80.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
-	maunium.net/go/mautrix v0.27.0 // indirect
 )
