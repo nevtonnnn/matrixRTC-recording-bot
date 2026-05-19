@@ -159,7 +159,11 @@ func (c *Client) handleRecordStop(ctx context.Context, roomID id.RoomID) {
 		}
 		return
 	}
-	c.sendText(ctx, roomID, fmt.Sprintf("⏹ Запись остановлена. Длительность: %s", session.Duration()))
+	if c.nc != nil {
+		c.sendText(ctx, roomID, fmt.Sprintf("⏹ Запись остановлена. Длительность: %s. Загружаю на Nextcloud...", session.Duration()))
+	} else {
+		c.sendText(ctx, roomID, fmt.Sprintf("⏹ Запись остановлена. Длительность: %s", session.Duration()))
+	}
 }
 
 func (c *Client) SendRoomFinished(ctx context.Context, livekitRoom string) {
@@ -167,25 +171,33 @@ func (c *Client) SendRoomFinished(ctx context.Context, livekitRoom string) {
 	if err != nil || session == nil {
 		return
 	}
-	c.sendText(ctx, id.RoomID(session.RoomID), fmt.Sprintf("⏹ Звонок завершён, запись сохранена. Длительность: %s", session.Duration()))
+	if c.nc != nil {
+		c.sendText(ctx, id.RoomID(session.RoomID), fmt.Sprintf("⏹ Звонок завершён. Длительность: %s. Загружаю на Nextcloud...", session.Duration()))
+	} else {
+		c.sendText(ctx, id.RoomID(session.RoomID), fmt.Sprintf("⏹ Звонок завершён, запись сохранена. Длительность: %s", session.Duration()))
+	}
 }
 
 func (c *Client) SendEgressEnded(egressID string, filePath string) {
-	session := c.manager.HandleEgressEnded(egressID)
+	session, alreadyStopped := c.manager.HandleEgressEnded(egressID)
 	if session == nil {
 		return
 	}
 	ctx := context.Background()
+	roomID := id.RoomID(session.RoomID)
 
 	if c.nc == nil || filePath == "" {
-		c.sendText(ctx, id.RoomID(session.RoomID), fmt.Sprintf("⏹ Запись завершена. Длительность: %s", session.Duration()))
+		if !alreadyStopped {
+			c.sendText(ctx, roomID, fmt.Sprintf("⏹ Запись завершена. Длительность: %s", session.Duration()))
+		}
 		return
 	}
 
-	c.sendText(ctx, id.RoomID(session.RoomID), fmt.Sprintf("⏹ Запись завершена. Длительность: %s. Загружаю на Nextcloud...", session.Duration()))
+	if !alreadyStopped {
+		c.sendText(ctx, roomID, fmt.Sprintf("⏹ Запись завершена. Длительность: %s. Загружаю на Nextcloud...", session.Duration()))
+	}
 
 	go func() {
-		roomID := id.RoomID(session.RoomID)
 		shareURL, err := c.nc.UploadAndShare(filePath, session.LiveKitRoom)
 		if err != nil {
 			c.log.Error("nextcloud upload failed", "file", filePath, "error", err)

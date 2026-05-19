@@ -14,6 +14,7 @@ var ErrAlreadyStopped = fmt.Errorf("recording already stopped")
 type Manager struct {
 	mu              sync.Mutex
 	sessions        map[string]*Session // key: Matrix room ID
+	stoppedSessions map[string]*Session // key: egress ID — awaiting egress_ended webhook
 	recentlyStopped map[string]time.Time
 	lk              *LiveKitClient
 	maxConcurrent   int
@@ -23,6 +24,7 @@ type Manager struct {
 func NewManager(lk *LiveKitClient, maxConcurrent int, log *slog.Logger) *Manager {
 	return &Manager{
 		sessions:        make(map[string]*Session),
+		stoppedSessions: make(map[string]*Session),
 		recentlyStopped: make(map[string]time.Time),
 		lk:              lk,
 		maxConcurrent:   maxConcurrent,
@@ -82,6 +84,7 @@ func (m *Manager) StopRecording(ctx context.Context, matrixRoomID string) (*Sess
 	}
 
 	delete(m.sessions, matrixRoomID)
+	m.stoppedSessions[session.EgressID] = session
 	m.recentlyStopped[matrixRoomID] = time.Now()
 
 	m.log.Info("recording stopped",
@@ -111,9 +114,18 @@ func (m *Manager) StopByLiveKitRoom(ctx context.Context, livekitRoom string) (*S
 	return m.StopRecording(ctx, foundKey)
 }
 
-func (m *Manager) HandleEgressEnded(egressID string) *Session {
+func (m *Manager) HandleEgressEnded(egressID string) (session *Session, alreadyStopped bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
+	if s, ok := m.stoppedSessions[egressID]; ok {
+		delete(m.stoppedSessions, egressID)
+		m.log.Info("egress ended after manual stop",
+			"room", s.RoomID,
+			"egress_id", egressID,
+		)
+		return s, true
+	}
 
 	for key, s := range m.sessions {
 		if s.EgressID == egressID {
@@ -123,10 +135,10 @@ func (m *Manager) HandleEgressEnded(egressID string) *Session {
 				"room", key,
 				"egress_id", egressID,
 			)
-			return s
+			return s, false
 		}
 	}
-	return nil
+	return nil, false
 }
 
 func (m *Manager) GetSession(matrixRoomID string) *Session {
