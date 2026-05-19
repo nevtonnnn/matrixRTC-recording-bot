@@ -40,7 +40,7 @@ func main() {
 		cfg.Recording.MaxVideoHeight,
 	)
 
-	mgr := recorder.NewManager(lkClient, log)
+	mgr := recorder.NewManager(lkClient, cfg.Recording.MaxConcurrent, log)
 
 	var nc *nextcloud.Client
 	if cfg.Nextcloud.URL != "" {

@@ -34,6 +34,7 @@ type RecordingConfig struct {
 	OutputDir      string `yaml:"output_dir"`
 	DefaultMode    string `yaml:"default_mode"`
 	MaxVideoHeight int32  `yaml:"max_video_height"`
+	MaxConcurrent  int    `yaml:"max_concurrent"`
 }
 
 type WebhookConfig struct {
@@ -70,6 +71,9 @@ func Load(path string) (*Config, error) {
 	}
 	if cfg.Recording.MaxVideoHeight == 0 {
 		cfg.Recording.MaxVideoHeight = 720
+	}
+	if cfg.Recording.MaxConcurrent == 0 {
+		cfg.Recording.MaxConcurrent = 1
 	}
 	if cfg.Webhook.Listen == "" {
 		cfg.Webhook.Listen = ":8080"

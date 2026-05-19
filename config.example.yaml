@@ -14,6 +14,7 @@ recording:
   output_dir: /recordings
   default_mode: screen
   max_video_height: 720
+  max_concurrent: 1
 
 webhook:
   listen: ":8080"

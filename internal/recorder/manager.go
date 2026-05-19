@@ -16,14 +16,16 @@ type Manager struct {
 	sessions        map[string]*Session // key: Matrix room ID
 	recentlyStopped map[string]time.Time
 	lk              *LiveKitClient
+	maxConcurrent   int
 	log             *slog.Logger
 }
 
-func NewManager(lk *LiveKitClient, log *slog.Logger) *Manager {
+func NewManager(lk *LiveKitClient, maxConcurrent int, log *slog.Logger) *Manager {
 	return &Manager{
 		sessions:        make(map[string]*Session),
 		recentlyStopped: make(map[string]time.Time),
 		lk:              lk,
+		maxConcurrent:   maxConcurrent,
 		log:             log,
 	}
 }
@@ -34,6 +36,10 @@ func (m *Manager) StartRecording(ctx context.Context, matrixRoomID, livekitRoom,
 
 	if _, exists := m.sessions[matrixRoomID]; exists {
 		return fmt.Errorf("recording already active in this room")
+	}
+
+	if m.maxConcurrent > 0 && len(m.sessions) >= m.maxConcurrent {
+		return fmt.Errorf("достигнут лимит одновременных записей (%d)", m.maxConcurrent)
 	}
 
 	egressID, err := m.lk.StartRecording(ctx, livekitRoom, mode)

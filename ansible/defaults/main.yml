@@ -33,6 +33,10 @@ matrix_recording_bot_layouts_base_url: "http://matrix-recording-bot:8080/layouts
 #   1080p — ~4+ ядер
 matrix_recording_bot_max_video_height: 720
 
+# Максимальное количество одновременных записей на сервере.
+# 0 = без ограничений.
+matrix_recording_bot_max_concurrent: 1
+
 # LiveKit Egress
 matrix_recording_bot_egress_enabled: "{{ matrix_recording_bot_enabled }}"
 matrix_recording_bot_egress_version: "v1.9.1"
