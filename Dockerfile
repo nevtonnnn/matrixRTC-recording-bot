@@ -1,6 +1,6 @@
 FROM golang:1-alpine AS builder
 
-RUN apk add --no-cache gcc musl-dev
+RUN apk update && apk add --no-cache gcc musl-dev
 
 WORKDIR /build
 COPY go.mod go.sum ./
