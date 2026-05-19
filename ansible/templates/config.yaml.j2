@@ -23,3 +23,13 @@ layouts:
   listen: ":8080"
   path: /layouts/
   base_url: "{{ matrix_recording_bot_layouts_base_url }}"
+
+{% if matrix_recording_bot_nextcloud_enabled | bool %}
+nextcloud:
+  url: "{{ matrix_recording_bot_nextcloud_url }}"
+  username: "{{ matrix_recording_bot_nextcloud_username }}"
+  password: "{{ matrix_recording_bot_nextcloud_password }}"
+  upload_dir: "{{ matrix_recording_bot_nextcloud_upload_dir }}"
+  delete_after_upload: {{ matrix_recording_bot_nextcloud_delete_after_upload | bool | lower }}
+  retention_days: {{ matrix_recording_bot_nextcloud_retention_days }}
+{% endif %}

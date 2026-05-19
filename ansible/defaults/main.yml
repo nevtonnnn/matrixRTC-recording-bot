@@ -38,3 +38,12 @@ matrix_recording_bot_egress_enabled: "{{ matrix_recording_bot_enabled }}"
 matrix_recording_bot_egress_version: "v1.9.1"
 matrix_recording_bot_egress_container_image: "docker.io/livekit/egress:{{ matrix_recording_bot_egress_version }}"
 matrix_recording_bot_egress_container_network: "{{ matrix_recording_bot_container_network }}"
+
+# Nextcloud integration (optional)
+matrix_recording_bot_nextcloud_enabled: false
+matrix_recording_bot_nextcloud_url: ""
+matrix_recording_bot_nextcloud_username: ""
+matrix_recording_bot_nextcloud_password: ""
+matrix_recording_bot_nextcloud_upload_dir: "/Recordings"
+matrix_recording_bot_nextcloud_delete_after_upload: false
+matrix_recording_bot_nextcloud_retention_days: 30
