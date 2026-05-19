@@ -90,8 +90,13 @@ func Load(path string) (*Config, error) {
 	if cfg.Nextcloud.UploadDir == "" {
 		cfg.Nextcloud.UploadDir = "/Recordings"
 	}
-	if cfg.Nextcloud.RetentionDays == 0 && cfg.Nextcloud.URL != "" {
-		cfg.Nextcloud.RetentionDays = 30
+	if cfg.Nextcloud.URL != "" {
+		if cfg.Nextcloud.Username == "" || cfg.Nextcloud.Password == "" {
+			return nil, fmt.Errorf("nextcloud.username and nextcloud.password are required when nextcloud.url is set")
+		}
+		if cfg.Nextcloud.RetentionDays == 0 {
+			cfg.Nextcloud.RetentionDays = 30
+		}
 	}
 	return &cfg, nil
 }

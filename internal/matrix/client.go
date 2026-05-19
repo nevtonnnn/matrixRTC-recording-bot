@@ -11,6 +11,8 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
+	"time"
 
 	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/crypto/cryptohelper"
@@ -29,6 +31,7 @@ type Client struct {
 	nc           *nextcloud.Client
 	cfg          *config.Config
 	log          *slog.Logger
+	uploadWg     sync.WaitGroup
 }
 
 func NewClient(ctx context.Context, cfg *config.Config, manager *recorder.Manager, nc *nextcloud.Client, log *slog.Logger) (*Client, error) {
@@ -62,6 +65,18 @@ func NewClient(ctx context.Context, cfg *config.Config, manager *recorder.Manage
 
 func (c *Client) Close() error {
 	return c.cryptoHelper.Close()
+}
+
+func (c *Client) WaitUploads(timeout time.Duration) {
+	done := make(chan struct{})
+	go func() {
+		c.uploadWg.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(timeout):
+	}
 }
 
 func (c *Client) Run(ctx context.Context) error {
@@ -197,15 +212,24 @@ func (c *Client) SendEgressEnded(egressID string, filePath string) {
 		c.sendText(ctx, roomID, fmt.Sprintf("⏹ Запись завершена. Длительность: %s. Загружаю на Nextcloud...", session.Duration()))
 	}
 
+	c.uploadWg.Add(1)
 	go func() {
-		shareURL, err := c.nc.UploadAndShare(filePath, session.LiveKitRoom)
-		if err != nil {
+		defer c.uploadWg.Done()
+
+		remotePath := c.nc.RemotePath(filePath, session.LiveKitRoom)
+		if err := c.nc.Upload(filePath, remotePath); err != nil {
 			c.log.Error("nextcloud upload failed", "file", filePath, "error", err)
 			c.sendText(ctx, roomID, fmt.Sprintf("❌ Не удалось загрузить на Nextcloud: %v", err))
 			return
 		}
 
-		c.sendText(ctx, roomID, fmt.Sprintf("📎 Запись: %s", shareURL))
+		shareURL, err := c.nc.ShareFile(remotePath)
+		if err != nil {
+			c.log.Error("nextcloud share failed", "remote", remotePath, "error", err)
+			c.sendText(ctx, roomID, "⚠️ Запись загружена на Nextcloud, но не удалось создать ссылку")
+		} else {
+			c.sendText(ctx, roomID, fmt.Sprintf("📎 Запись: %s", shareURL))
+		}
 
 		if c.cfg.Nextcloud.DeleteAfterUpload {
 			if err := os.Remove(filePath); err != nil {

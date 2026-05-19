@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/nevtonnnn/matrixRTC-recording-bot/internal/config"
 	"github.com/nevtonnnn/matrixRTC-recording-bot/internal/layouts"
@@ -116,4 +117,5 @@ func main() {
 	<-sigCh
 	log.Info("shutting down")
 	cancel()
+	mxClient.WaitUploads(30 * time.Second)
 }

@@ -32,6 +32,27 @@ func NewManager(lk *LiveKitClient, maxConcurrent int, log *slog.Logger) *Manager
 	}
 }
 
+const (
+	recentStoppedTTL  = 60 * time.Second
+	stoppedSessionTTL = 10 * time.Minute
+)
+
+func (m *Manager) cleanupStaleLocked() {
+	now := time.Now()
+	for k, t := range m.recentlyStopped {
+		if now.Sub(t) > recentStoppedTTL {
+			delete(m.recentlyStopped, k)
+		}
+	}
+	for eid, s := range m.stoppedSessions {
+		if !s.StopTime.IsZero() && now.Sub(s.StopTime) > stoppedSessionTTL {
+			m.log.Warn("purging stale stopped session (webhook never arrived)",
+				"egress_id", eid, "room", s.RoomID)
+			delete(m.stoppedSessions, eid)
+		}
+	}
+}
+
 func (m *Manager) StartRecording(ctx context.Context, matrixRoomID, livekitRoom, initiator string, mode Mode) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -71,9 +92,11 @@ func (m *Manager) StopRecording(ctx context.Context, matrixRoomID string) (*Sess
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	m.cleanupStaleLocked()
+
 	session, exists := m.sessions[matrixRoomID]
 	if !exists {
-		if t, ok := m.recentlyStopped[matrixRoomID]; ok && time.Since(t) < 60*time.Second {
+		if _, ok := m.recentlyStopped[matrixRoomID]; ok {
 			return nil, ErrAlreadyStopped
 		}
 		return nil, ErrNoRecording
@@ -83,9 +106,10 @@ func (m *Manager) StopRecording(ctx context.Context, matrixRoomID string) (*Sess
 		return nil, err
 	}
 
+	session.StopTime = time.Now()
 	delete(m.sessions, matrixRoomID)
 	m.stoppedSessions[session.EgressID] = session
-	m.recentlyStopped[matrixRoomID] = time.Now()
+	m.recentlyStopped[matrixRoomID] = session.StopTime
 
 	m.log.Info("recording stopped",
 		"room", matrixRoomID,
@@ -118,6 +142,8 @@ func (m *Manager) HandleEgressEnded(egressID string) (session *Session, alreadyS
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	m.cleanupStaleLocked()
+
 	if s, ok := m.stoppedSessions[egressID]; ok {
 		delete(m.stoppedSessions, egressID)
 		m.log.Info("egress ended after manual stop",
@@ -129,8 +155,9 @@ func (m *Manager) HandleEgressEnded(egressID string) (session *Session, alreadyS
 
 	for key, s := range m.sessions {
 		if s.EgressID == egressID {
+			s.StopTime = time.Now()
 			delete(m.sessions, key)
-			m.recentlyStopped[key] = time.Now()
+			m.recentlyStopped[key] = s.StopTime
 			m.log.Info("egress ended externally",
 				"room", key,
 				"egress_id", egressID,

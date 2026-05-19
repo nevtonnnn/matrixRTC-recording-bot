@@ -66,6 +66,7 @@ All Ansible variables with defaults:
 | `matrix_recording_bot_matrix_pickle_key` | `"change-me..."` | Secret for E2EE database encryption |
 | `matrix_recording_bot_default_mode` | `"screen"` | Default recording mode |
 | `matrix_recording_bot_max_video_height` | `720` | Video resolution (CPU: 360p~1 core, 720p~3, 1080p~4+) |
+| `matrix_recording_bot_max_concurrent` | `1` | Max simultaneous recordings (0 = unlimited) |
 | `matrix_recording_bot_egress_enabled` | same as bot | Deploy LiveKit Egress alongside the bot |
 | `matrix_recording_bot_egress_version` | `"v1.9.1"` | LiveKit Egress Docker image version |
 | `matrix_recording_bot_nextcloud_enabled` | `false` | Enable Nextcloud upload integration |

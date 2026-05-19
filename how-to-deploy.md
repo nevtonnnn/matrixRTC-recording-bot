@@ -66,6 +66,9 @@ matrix_recording_bot_matrix_pickle_key: "random-secret-for-e2ee-storage"
 # Default recording mode (optional, default "screen")
 # matrix_recording_bot_default_mode: "screen"
 
+# Max simultaneous recordings (optional, default 1, 0 = unlimited)
+# matrix_recording_bot_max_concurrent: 3
+
 # Nextcloud integration (optional)
 # matrix_recording_bot_nextcloud_enabled: true
 # matrix_recording_bot_nextcloud_url: "https://cloud.example.com"

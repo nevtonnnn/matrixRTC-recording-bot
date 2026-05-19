@@ -175,13 +175,14 @@ func (c *Client) ShareFile(remotePath string) (string, error) {
 	return ocsResp.Data.URL + "/download", nil
 }
 
-// UploadAndShare uploads a local file to Nextcloud and returns a public download URL.
-// The remote path is computed as uploadDir/sanitizedRoom/filename.
-// Room name slashes are replaced with underscores.
-func (c *Client) UploadAndShare(localPath, livekitRoom string) (string, error) {
+func (c *Client) RemotePath(localPath, livekitRoom string) string {
 	sanitizedRoom := strings.ReplaceAll(livekitRoom, "/", "_")
 	filename := path.Base(localPath)
-	remotePath := c.uploadDir + "/" + sanitizedRoom + "/" + filename
+	return c.uploadDir + "/" + sanitizedRoom + "/" + filename
+}
+
+func (c *Client) UploadAndShare(localPath, livekitRoom string) (string, error) {
+	remotePath := c.RemotePath(localPath, livekitRoom)
 
 	if err := c.Upload(localPath, remotePath); err != nil {
 		return "", fmt.Errorf("uploading file: %w", err)
@@ -341,7 +342,6 @@ func (c *Client) ListFolder(remotePath string) ([]FileInfo, error) {
 	return files, nil
 }
 
-// Cleanup deletes files in uploadDir older than retentionDays. Directories are skipped.
 func (c *Client) Cleanup(retentionDays int) error {
 	files, err := c.ListFolder(c.uploadDir)
 	if err != nil {
@@ -350,14 +350,34 @@ func (c *Client) Cleanup(retentionDays int) error {
 
 	cutoff := time.Now().AddDate(0, 0, -retentionDays)
 
+	dirsWithFiles := make(map[string]bool)
+	var dirs []string
+
 	for _, fi := range files {
-		if fi.IsDir || fi.LastModified.IsZero() {
+		if fi.IsDir {
+			dirs = append(dirs, fi.Path)
+			continue
+		}
+		if fi.LastModified.IsZero() {
+			dirsWithFiles[path.Dir(fi.Path)] = true
 			continue
 		}
 		if fi.LastModified.Before(cutoff) {
 			c.log.Info("deleting old file", "path", fi.Path, "lastModified", fi.LastModified)
 			if err := c.DeleteFile(fi.Path); err != nil {
 				c.log.Error("failed to delete file during cleanup", "path", fi.Path, "error", err)
+				dirsWithFiles[path.Dir(fi.Path)] = true
+			}
+		} else {
+			dirsWithFiles[path.Dir(fi.Path)] = true
+		}
+	}
+
+	for _, dir := range dirs {
+		if !dirsWithFiles[dir] {
+			c.log.Info("deleting empty directory", "path", dir)
+			if err := c.DeleteFile(dir); err != nil {
+				c.log.Error("failed to delete empty directory", "path", dir, "error", err)
 			}
 		}
 	}
@@ -365,11 +385,9 @@ func (c *Client) Cleanup(retentionDays int) error {
 	return nil
 }
 
-// RunCleanupLoop runs Cleanup once immediately and then every 24 hours until ctx is cancelled.
-// Returns immediately if retentionDays <= 0.
-func (c *Client) RunCleanupLoop(ctx context.Context, retentionDays int) error {
+func (c *Client) RunCleanupLoop(ctx context.Context, retentionDays int) {
 	if retentionDays <= 0 {
-		return nil
+		return
 	}
 
 	if err := c.Cleanup(retentionDays); err != nil {
@@ -382,7 +400,7 @@ func (c *Client) RunCleanupLoop(ctx context.Context, retentionDays int) error {
 	for {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return
 		case <-ticker.C:
 			if err := c.Cleanup(retentionDays); err != nil {
 				c.log.Error("cleanup failed", "error", err)

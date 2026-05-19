@@ -30,6 +30,7 @@ type Session struct {
 	EgressID    string
 	Mode        Mode
 	StartTime   time.Time
+	StopTime    time.Time
 	Initiator   string
 	LiveKitRoom string
 }
@@ -42,5 +43,8 @@ func (s *Session) FileExtension() string {
 }
 
 func (s *Session) Duration() time.Duration {
+	if !s.StopTime.IsZero() {
+		return s.StopTime.Sub(s.StartTime)
+	}
 	return time.Since(s.StartTime)
 }
