@@ -102,25 +102,26 @@ func (c *Client) handleMessage(ctx context.Context, evt *event.Event) {
 		return
 	}
 
-	switch {
-	case strings.HasPrefix(body, "!record-call"):
-		c.handleRecordCall(ctx, evt.RoomID, sender, body)
-	case body == "!record-stop":
+	if !strings.HasPrefix(body, "!record") {
+		return
+	}
+	parts := strings.Fields(body)
+	if len(parts) < 2 {
+		c.sendText(ctx, evt.RoomID, "Доступные команды: !record screen, !record full, !record voice, !record stop")
+		return
+	}
+	switch parts[1] {
+	case "stop":
 		c.handleRecordStop(ctx, evt.RoomID)
+	case "full", "screen", "voice":
+		c.handleRecordCall(ctx, evt.RoomID, sender, parts[1])
+	default:
+		c.sendText(ctx, evt.RoomID, "Неизвестная команда. Доступные: !record screen, !record full, !record voice, !record stop")
 	}
 }
 
-func (c *Client) handleRecordCall(ctx context.Context, roomID id.RoomID, sender id.UserID, body string) {
-	parts := strings.Fields(body)
-	modeStr := ""
-	if len(parts) > 1 {
-		modeStr = parts[1]
-	}
-	mode, ok := recorder.ParseMode(modeStr, c.cfg.Recording.DefaultMode)
-	if !ok {
-		c.sendText(ctx, roomID, "Неизвестный режим. Доступные: full, screen, voice")
-		return
-	}
+func (c *Client) handleRecordCall(ctx context.Context, roomID id.RoomID, sender id.UserID, modeStr string) {
+	mode, _ := recorder.ParseMode(modeStr, c.cfg.Recording.DefaultMode)
 
 	livekitRoom, err := c.getLiveKitRoomName(ctx, roomID)
 	if err != nil {
