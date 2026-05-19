@@ -5,14 +5,13 @@ import (
 	"net/http"
 
 	"github.com/livekit/protocol/auth"
-	"github.com/livekit/protocol/livekit"
 	lkwebhook "github.com/livekit/protocol/webhook"
 
 	"github.com/nevtonnnn/matrixRTC-recording-bot/internal/recorder"
 )
 
 type OnRoomFinished func(livekitRoom string)
-type OnEgressEnded func(egressID string, info *livekit.EgressInfo)
+type OnEgressEnded func(egressID string, filePath string)
 
 type Handler struct {
 	keyProvider    *auth.SimpleKeyProvider
@@ -48,8 +47,13 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			h.onRoomFinished(event.GetRoom().GetName())
 		}
 	case lkwebhook.EventEgressEnded:
-		if event.GetEgressInfo() != nil {
-			h.onEgressEnded(event.GetEgressInfo().GetEgressId(), event.GetEgressInfo())
+		info := event.GetEgressInfo()
+		if info != nil {
+			var filePath string
+			if results := info.GetFileResults(); len(results) > 0 {
+				filePath = results[0].GetFilename()
+			}
+			h.onEgressEnded(info.GetEgressId(), filePath)
 		}
 	}
 

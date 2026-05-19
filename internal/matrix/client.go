@@ -9,6 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"os"
 	"strings"
 
 	"maunium.net/go/mautrix"
@@ -17,6 +18,7 @@ import (
 	"maunium.net/go/mautrix/id"
 
 	"github.com/nevtonnnn/matrixRTC-recording-bot/internal/config"
+	"github.com/nevtonnnn/matrixRTC-recording-bot/internal/nextcloud"
 	"github.com/nevtonnnn/matrixRTC-recording-bot/internal/recorder"
 )
 
@@ -24,11 +26,12 @@ type Client struct {
 	mx           *mautrix.Client
 	cryptoHelper *cryptohelper.CryptoHelper
 	manager      *recorder.Manager
+	nc           *nextcloud.Client
 	cfg          *config.Config
 	log          *slog.Logger
 }
 
-func NewClient(ctx context.Context, cfg *config.Config, manager *recorder.Manager, log *slog.Logger) (*Client, error) {
+func NewClient(ctx context.Context, cfg *config.Config, manager *recorder.Manager, nc *nextcloud.Client, log *slog.Logger) (*Client, error) {
 	mx, err := mautrix.NewClient(cfg.Matrix.Homeserver, "", "")
 	if err != nil {
 		return nil, fmt.Errorf("creating matrix client: %w", err)
@@ -54,7 +57,7 @@ func NewClient(ctx context.Context, cfg *config.Config, manager *recorder.Manage
 		return nil, fmt.Errorf("initializing crypto: %w", err)
 	}
 
-	return &Client{mx: mx, cryptoHelper: helper, manager: manager, cfg: cfg, log: log}, nil
+	return &Client{mx: mx, cryptoHelper: helper, manager: manager, nc: nc, cfg: cfg, log: log}, nil
 }
 
 func (c *Client) Close() error {
@@ -167,13 +170,39 @@ func (c *Client) SendRoomFinished(ctx context.Context, livekitRoom string) {
 	c.sendText(ctx, id.RoomID(session.RoomID), fmt.Sprintf("⏹ Звонок завершён, запись сохранена. Длительность: %s", session.Duration()))
 }
 
-func (c *Client) SendEgressEnded(egressID string) {
+func (c *Client) SendEgressEnded(egressID string, filePath string) {
 	session := c.manager.HandleEgressEnded(egressID)
 	if session == nil {
 		return
 	}
 	ctx := context.Background()
-	c.sendText(ctx, id.RoomID(session.RoomID), fmt.Sprintf("⏹ Запись завершена. Длительность: %s", session.Duration()))
+
+	if c.nc == nil || filePath == "" {
+		c.sendText(ctx, id.RoomID(session.RoomID), fmt.Sprintf("⏹ Запись завершена. Длительность: %s", session.Duration()))
+		return
+	}
+
+	c.sendText(ctx, id.RoomID(session.RoomID), fmt.Sprintf("⏹ Запись завершена. Длительность: %s. Загружаю на Nextcloud...", session.Duration()))
+
+	go func() {
+		roomID := id.RoomID(session.RoomID)
+		shareURL, err := c.nc.UploadAndShare(filePath, session.LiveKitRoom)
+		if err != nil {
+			c.log.Error("nextcloud upload failed", "file", filePath, "error", err)
+			c.sendText(ctx, roomID, fmt.Sprintf("❌ Не удалось загрузить на Nextcloud: %v", err))
+			return
+		}
+
+		c.sendText(ctx, roomID, fmt.Sprintf("📎 Запись: %s", shareURL))
+
+		if c.cfg.Nextcloud.DeleteAfterUpload {
+			if err := os.Remove(filePath); err != nil {
+				c.log.Warn("failed to delete local file after upload", "file", filePath, "error", err)
+			} else {
+				c.log.Info("deleted local file after upload", "file", filePath)
+			}
+		}
+	}()
 }
 
 func (c *Client) getLiveKitRoomName(ctx context.Context, roomID id.RoomID) (string, error) {

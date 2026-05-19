@@ -9,11 +9,10 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/livekit/protocol/livekit"
-
 	"github.com/nevtonnnn/matrixRTC-recording-bot/internal/config"
 	"github.com/nevtonnnn/matrixRTC-recording-bot/internal/layouts"
 	"github.com/nevtonnnn/matrixRTC-recording-bot/internal/matrix"
+	"github.com/nevtonnnn/matrixRTC-recording-bot/internal/nextcloud"
 	"github.com/nevtonnnn/matrixRTC-recording-bot/internal/recorder"
 	"github.com/nevtonnnn/matrixRTC-recording-bot/internal/webhook"
 )
@@ -43,10 +42,22 @@ func main() {
 
 	mgr := recorder.NewManager(lkClient, log)
 
+	var nc *nextcloud.Client
+	if cfg.Nextcloud.URL != "" {
+		nc = nextcloud.NewClient(
+			cfg.Nextcloud.URL,
+			cfg.Nextcloud.Username,
+			cfg.Nextcloud.Password,
+			cfg.Nextcloud.UploadDir,
+			log,
+		)
+		log.Info("nextcloud integration enabled", "url", cfg.Nextcloud.URL, "upload_dir", cfg.Nextcloud.UploadDir)
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	mxClient, err := matrix.NewClient(ctx, cfg, mgr, log)
+	mxClient, err := matrix.NewClient(ctx, cfg, mgr, nc, log)
 	if err != nil {
 		log.Error("failed to create matrix client", "error", err)
 		os.Exit(1)
@@ -66,8 +77,8 @@ func main() {
 		func(livekitRoom string) {
 			mxClient.SendRoomFinished(ctx, livekitRoom)
 		},
-		func(egressID string, info *livekit.EgressInfo) {
-			mxClient.SendEgressEnded(egressID)
+		func(egressID string, filePath string) {
+			mxClient.SendEgressEnded(egressID, filePath)
 		},
 		log,
 	)
@@ -88,6 +99,10 @@ func main() {
 			cancel()
 		}
 	}()
+
+	if nc != nil && cfg.Nextcloud.RetentionDays > 0 {
+		go nc.RunCleanupLoop(ctx, cfg.Nextcloud.RetentionDays)
+	}
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
