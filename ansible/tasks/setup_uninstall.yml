@@ -1,0 +1,34 @@
+---
+- name: Check if recording-bot service exists
+  ansible.builtin.stat:
+    path: "/etc/systemd/system/matrix-recording-bot.service"
+  register: matrix_recording_bot_service_stat
+
+- name: Ensure recording-bot stopped and disabled
+  ansible.builtin.systemd:
+    name: matrix-recording-bot
+    state: stopped
+    enabled: false
+  when: matrix_recording_bot_service_stat.stat.exists
+
+- name: Ensure recording-bot systemd service removed
+  ansible.builtin.file:
+    path: "/etc/systemd/system/matrix-recording-bot.service"
+    state: absent
+
+- name: Check if egress service exists
+  ansible.builtin.stat:
+    path: "/etc/systemd/system/matrix-livekit-egress.service"
+  register: matrix_livekit_egress_service_stat
+
+- name: Ensure egress stopped and disabled
+  ansible.builtin.systemd:
+    name: matrix-livekit-egress
+    state: stopped
+    enabled: false
+  when: matrix_livekit_egress_service_stat.stat.exists
+
+- name: Ensure egress systemd service removed
+  ansible.builtin.file:
+    path: "/etc/systemd/system/matrix-livekit-egress.service"
+    state: absent

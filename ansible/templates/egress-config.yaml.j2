@@ -1,0 +1,17 @@
+api_key: "{{ matrix_recording_bot_livekit_api_key }}"
+api_secret: "{{ matrix_recording_bot_livekit_api_secret }}"
+ws_url: "ws://matrix-livekit-server:7880"
+redis:
+  address: "{{ valkey_identifier }}:6379"
+
+health_port: 3456
+log_level: info
+insecure: true
+
+cpu_cost:
+  room_composite_cpu_cost: 1.5
+  web_cpu_cost: 1.5
+  audio_room_composite_cpu_cost: 0.5
+
+session_limits:
+  file_output_max_duration: 4h

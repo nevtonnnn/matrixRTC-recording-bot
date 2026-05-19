@@ -8,7 +8,7 @@ import (
 	"github.com/livekit/protocol/livekit"
 	lkwebhook "github.com/livekit/protocol/webhook"
 
-	"github.com/vlad/matrix-recording-bot/internal/recorder"
+	"github.com/nevtonnnn/matrixRTC-recording-bot/internal/recorder"
 )
 
 type OnRoomFinished func(livekitRoom string)

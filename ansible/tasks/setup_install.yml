@@ -1,0 +1,66 @@
+---
+- name: Ensure recording-bot paths exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0750"
+    owner: "{{ matrix_user_uid }}"
+    group: "{{ matrix_user_gid }}"
+  with_items:
+    - "{{ matrix_recording_bot_base_path }}"
+    - "{{ matrix_recording_bot_config_path }}"
+
+- name: Ensure recordings path exists
+  ansible.builtin.file:
+    path: "{{ matrix_recording_bot_recordings_path }}"
+    state: directory
+    mode: "0777"
+    owner: "{{ matrix_user_uid }}"
+    group: "{{ matrix_user_gid }}"
+
+- name: Ensure crypto.db owned by matrix user (if exists)
+  ansible.builtin.file:
+    path: "{{ matrix_recording_bot_config_path }}/crypto.db"
+    owner: "{{ matrix_user_uid }}"
+    group: "{{ matrix_user_gid }}"
+  failed_when: false
+
+- name: Ensure recording-bot config installed
+  ansible.builtin.template:
+    src: "{{ role_path }}/templates/config.yaml.j2"
+    dest: "{{ matrix_recording_bot_config_path }}/config.yaml"
+    mode: "0640"
+    owner: "{{ matrix_user_uid }}"
+    group: "{{ matrix_user_gid }}"
+
+- name: Ensure recording-bot container network exists
+  community.docker.docker_network:
+    name: "{{ matrix_recording_bot_container_network }}"
+    driver: bridge
+
+- name: Ensure recording-bot systemd service installed
+  ansible.builtin.template:
+    src: "{{ role_path }}/templates/systemd.service.j2"
+    dest: "/etc/systemd/system/matrix-recording-bot.service"
+    mode: "0644"
+
+# Egress
+- name: Ensure egress config installed
+  ansible.builtin.template:
+    src: "{{ role_path }}/templates/egress-config.yaml.j2"
+    dest: "{{ matrix_recording_bot_config_path }}/egress.yaml"
+    mode: "0644"
+    owner: "{{ matrix_user_uid }}"
+    group: "{{ matrix_user_gid }}"
+  when: matrix_recording_bot_egress_enabled | bool
+
+- name: Ensure egress systemd service installed
+  ansible.builtin.template:
+    src: "{{ role_path }}/templates/egress-systemd.service.j2"
+    dest: "/etc/systemd/system/matrix-livekit-egress.service"
+    mode: "0644"
+  when: matrix_recording_bot_egress_enabled | bool
+
+- name: Ensure systemd reloaded
+  ansible.builtin.systemd:
+    daemon_reload: true

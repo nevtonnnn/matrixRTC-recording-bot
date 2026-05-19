@@ -1,17 +1,19 @@
 matrix:
-  homeserver: https://derevnia-durakov.ru
-  user_id: "@recording-bot:derevnia-durakov.ru"
+  homeserver: "https://matrix.example.com"
+  user_id: "@recording-bot:example.com"
   password: "bot-password"
   pickle_key: "random-secret-string"
 
 livekit:
-  url: https://derevnia-durakov.ru
-  api_key: "your-api-key"
-  api_secret: "your-api-secret"
+  url: "http://livekit-server:7880"
+  api_key: "your-livekit-api-key"
+  api_secret: "your-livekit-api-secret"
+  jwt_service_url: "http://livekit-jwt-service:8080"
 
 recording:
   output_dir: /recordings
   default_mode: screen
+  max_video_height: 720
 
 webhook:
   listen: ":8080"
@@ -20,3 +22,4 @@ webhook:
 layouts:
   listen: ":8080"
   path: /layouts/
+  base_url: "http://matrix-recording-bot:8080/layouts/screen.html"

@@ -1,0 +1,28 @@
+[Unit]
+Description=Matrix Recording Bot
+After=docker.service matrix-synapse.service matrix-livekit-server.service
+Requires=docker.service
+
+[Service]
+Type=simple
+Environment="HOME={{ matrix_recording_bot_base_path }}"
+ExecStartPre=-/usr/bin/docker stop matrix-recording-bot
+ExecStartPre=-/usr/bin/docker rm matrix-recording-bot
+ExecStart=/usr/bin/docker run \
+  --rm \
+  --name=matrix-recording-bot \
+  --user={{ matrix_user_uid }}:{{ matrix_user_gid }} \
+  --network={{ matrix_recording_bot_container_network }} \
+  {% for network in matrix_recording_bot_container_additional_networks %}
+  --network={{ network }} \
+  {% endfor %}
+  -v {{ matrix_recording_bot_config_path }}:/config \
+  -v {{ matrix_recording_bot_recordings_path }}:/recordings \
+  {{ matrix_recording_bot_container_image }}
+ExecStop=-/usr/bin/docker stop matrix-recording-bot
+
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target

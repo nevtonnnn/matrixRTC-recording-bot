@@ -1,0 +1,19 @@
+---
+- tags:
+    - setup-all
+    - setup-recording-bot
+    - install-all
+    - install-recording-bot
+  block:
+    - when: matrix_recording_bot_enabled | bool
+      tags:
+        - setup-recording-bot
+        - install-recording-bot
+      block:
+        - ansible.builtin.include_tasks: "{{ role_path }}/tasks/validate_config.yml"
+        - ansible.builtin.include_tasks: "{{ role_path }}/tasks/setup_install.yml"
+
+    - when: not (matrix_recording_bot_enabled | bool)
+      tags:
+        - setup-recording-bot
+      ansible.builtin.include_tasks: "{{ role_path }}/tasks/setup_uninstall.yml"

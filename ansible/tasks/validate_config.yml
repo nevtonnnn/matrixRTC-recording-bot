@@ -1,0 +1,10 @@
+---
+- name: Fail if Matrix RTC not enabled
+  ansible.builtin.fail:
+    msg: "matrix_rtc_enabled must be true for recording bot to work"
+  when: not (matrix_rtc_enabled | default(false) | bool)
+
+- name: Fail if password not set
+  ansible.builtin.fail:
+    msg: "matrix_recording_bot_matrix_password must be set"
+  when: matrix_recording_bot_matrix_password == ""

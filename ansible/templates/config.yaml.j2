@@ -1,0 +1,25 @@
+matrix:
+  homeserver: "{{ matrix_addons_homeserver_client_api_url }}"
+  user_id: "{{ matrix_recording_bot_matrix_user_id }}"
+  password: "{{ matrix_recording_bot_matrix_password }}"
+  pickle_key: "{{ matrix_recording_bot_matrix_pickle_key }}"
+
+livekit:
+  url: "{{ matrix_recording_bot_livekit_url }}"
+  api_key: "{{ matrix_recording_bot_livekit_api_key }}"
+  api_secret: "{{ matrix_recording_bot_livekit_api_secret }}"
+  jwt_service_url: "{{ matrix_recording_bot_livekit_jwt_service_url }}"
+
+recording:
+  output_dir: /recordings
+  default_mode: "{{ matrix_recording_bot_default_mode }}"
+  max_video_height: {{ matrix_recording_bot_max_video_height }}
+
+webhook:
+  listen: ":8080"
+  path: /webhook
+
+layouts:
+  listen: ":8080"
+  path: /layouts/
+  base_url: "{{ matrix_recording_bot_layouts_base_url }}"

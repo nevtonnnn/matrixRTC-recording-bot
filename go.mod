@@ -1,4 +1,4 @@
-module github.com/vlad/matrix-recording-bot
+module github.com/nevtonnnn/matrixRTC-recording-bot
 
 go 1.26
 

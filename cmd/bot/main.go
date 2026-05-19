@@ -11,11 +11,11 @@ import (
 
 	"github.com/livekit/protocol/livekit"
 
-	"github.com/vlad/matrix-recording-bot/internal/config"
-	"github.com/vlad/matrix-recording-bot/internal/layouts"
-	"github.com/vlad/matrix-recording-bot/internal/matrix"
-	"github.com/vlad/matrix-recording-bot/internal/recorder"
-	"github.com/vlad/matrix-recording-bot/internal/webhook"
+	"github.com/nevtonnnn/matrixRTC-recording-bot/internal/config"
+	"github.com/nevtonnnn/matrixRTC-recording-bot/internal/layouts"
+	"github.com/nevtonnnn/matrixRTC-recording-bot/internal/matrix"
+	"github.com/nevtonnnn/matrixRTC-recording-bot/internal/recorder"
+	"github.com/nevtonnnn/matrixRTC-recording-bot/internal/webhook"
 )
 
 func main() {

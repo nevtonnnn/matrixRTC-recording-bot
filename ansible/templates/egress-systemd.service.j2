@@ -1,0 +1,28 @@
+[Unit]
+Description=LiveKit Egress
+After=docker.service matrix-livekit-server.service {{ valkey_identifier }}.service
+Requires=docker.service
+BindsTo={{ valkey_identifier }}.service
+
+[Service]
+Type=simple
+ExecStartPre=-/usr/bin/docker stop matrix-livekit-egress
+ExecStartPre=-/usr/bin/docker rm matrix-livekit-egress
+ExecStart=/usr/bin/docker run \
+  --rm \
+  --name=matrix-livekit-egress \
+  --network={{ matrix_recording_bot_egress_container_network }} \
+  --network={{ valkey_identifier }} \
+  --network=matrix-addons \
+  -v {{ matrix_recording_bot_config_path }}/egress.yaml:/etc/egress.yaml:ro \
+  -v {{ matrix_recording_bot_recordings_path }}:/recordings \
+  --shm-size=2g \
+  -e EGRESS_CONFIG_FILE=/etc/egress.yaml \
+  {{ matrix_recording_bot_egress_container_image }}
+ExecStop=-/usr/bin/docker stop matrix-livekit-egress
+
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,40 @@
+---
+matrix_recording_bot_enabled: false
+
+matrix_recording_bot_version: "dev"
+matrix_recording_bot_container_image: "matrix-recording-bot:{{ matrix_recording_bot_version }}"
+
+matrix_recording_bot_base_path: "{{ matrix_base_data_path }}/recording-bot"
+matrix_recording_bot_config_path: "{{ matrix_recording_bot_base_path }}/config"
+matrix_recording_bot_recordings_path: "{{ matrix_base_data_path }}/recordings"
+
+matrix_recording_bot_container_network: matrix-recording-bot
+matrix_recording_bot_container_additional_networks:
+  - "{{ matrix_playbook_reverse_proxyable_services_additional_network }}"
+  - matrix-addons
+
+matrix_recording_bot_matrix_user_id: "@recording-bot:{{ matrix_domain }}"
+matrix_recording_bot_matrix_password: ""
+matrix_recording_bot_matrix_pickle_key: "change-me-to-a-random-secret"
+
+matrix_recording_bot_livekit_api_key: "{{ matrix_livekit_jwt_service_environment_variable_livekit_key }}"
+matrix_recording_bot_livekit_api_secret: "{{ matrix_livekit_jwt_service_environment_variable_livekit_secret }}"
+matrix_recording_bot_livekit_url: "http://{{ livekit_server_identifier }}:{{ livekit_server_config_port }}"
+matrix_recording_bot_livekit_jwt_service_url: "http://matrix-livekit-jwt-service:8080"
+
+matrix_recording_bot_default_mode: "screen"
+matrix_recording_bot_layouts_base_url: "http://matrix-recording-bot:8080/layouts/screen.html"
+
+# Максимальная высота видео для режимов full и screen.
+# Чем выше разрешение, тем больше CPU нужно Egress на одну запись:
+#   360p  — ~1 ядро (подходит для серверов с 2 ядрами)
+#   480p  — ~1.5 ядра
+#   720p  — ~3 ядра
+#   1080p — ~4+ ядер
+matrix_recording_bot_max_video_height: 720
+
+# LiveKit Egress
+matrix_recording_bot_egress_enabled: "{{ matrix_recording_bot_enabled }}"
+matrix_recording_bot_egress_version: "v1.9.1"
+matrix_recording_bot_egress_container_image: "docker.io/livekit/egress:{{ matrix_recording_bot_egress_version }}"
+matrix_recording_bot_egress_container_network: "{{ matrix_recording_bot_container_network }}"
