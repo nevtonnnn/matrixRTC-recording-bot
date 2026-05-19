@@ -23,3 +23,12 @@ layouts:
   listen: ":8080"
   path: /layouts/
   base_url: "http://matrix-recording-bot:8080/layouts/screen.html"
+
+# Optional: upload recordings to Nextcloud
+# nextcloud:
+#   url: "https://cloud.example.com"
+#   username: "recording-bot"
+#   password: "app-password-here"
+#   upload_dir: "/Recordings"
+#   delete_after_upload: false
+#   retention_days: 30

@@ -13,6 +13,7 @@ type Config struct {
 	Recording RecordingConfig `yaml:"recording"`
 	Webhook   WebhookConfig   `yaml:"webhook"`
 	Layouts   LayoutsConfig   `yaml:"layouts"`
+	Nextcloud NextcloudConfig `yaml:"nextcloud"`
 }
 
 type MatrixConfig struct {
@@ -46,6 +47,15 @@ type LayoutsConfig struct {
 	BaseURL string `yaml:"base_url"`
 }
 
+type NextcloudConfig struct {
+	URL               string `yaml:"url"`
+	Username          string `yaml:"username"`
+	Password          string `yaml:"password"`
+	UploadDir         string `yaml:"upload_dir"`
+	DeleteAfterUpload bool   `yaml:"delete_after_upload"`
+	RetentionDays     int    `yaml:"retention_days"`
+}
+
 func Load(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -72,6 +82,12 @@ func Load(path string) (*Config, error) {
 	}
 	if cfg.Layouts.Path == "" {
 		cfg.Layouts.Path = "/layouts/"
+	}
+	if cfg.Nextcloud.UploadDir == "" {
+		cfg.Nextcloud.UploadDir = "/Recordings"
+	}
+	if cfg.Nextcloud.RetentionDays == 0 && cfg.Nextcloud.URL != "" {
+		cfg.Nextcloud.RetentionDays = 30
 	}
 	return &cfg, nil
 }
