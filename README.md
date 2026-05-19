@@ -13,6 +13,7 @@ Listens for commands in Matrix rooms, starts [LiveKit Egress](https://docs.livek
 - Automatic stop when the call ends (via LiveKit webhooks)
 - E2EE support — the bot can join encrypted Matrix rooms and read commands
 - Session restore on restart — picks up in-progress egress sessions
+- **Nextcloud integration** — upload recordings to Nextcloud and share download links in chat
 
 ## Architecture
 
@@ -67,6 +68,13 @@ All Ansible variables with defaults:
 | `matrix_recording_bot_max_video_height` | `720` | Video resolution (CPU: 360p~1 core, 720p~3, 1080p~4+) |
 | `matrix_recording_bot_egress_enabled` | same as bot | Deploy LiveKit Egress alongside the bot |
 | `matrix_recording_bot_egress_version` | `"v1.9.1"` | LiveKit Egress Docker image version |
+| `matrix_recording_bot_nextcloud_enabled` | `false` | Enable Nextcloud upload integration |
+| `matrix_recording_bot_nextcloud_url` | `""` | Nextcloud server URL (e.g. `https://cloud.example.com`) |
+| `matrix_recording_bot_nextcloud_username` | `""` | Nextcloud username for the bot |
+| `matrix_recording_bot_nextcloud_password` | `""` | Nextcloud app password |
+| `matrix_recording_bot_nextcloud_upload_dir` | `"/Recordings"` | Upload directory on Nextcloud |
+| `matrix_recording_bot_nextcloud_delete_after_upload` | `false` | Delete local file after successful upload |
+| `matrix_recording_bot_nextcloud_retention_days` | `30` | Auto-delete recordings after N days (0 = disabled) |
 
 ## Recordings
 

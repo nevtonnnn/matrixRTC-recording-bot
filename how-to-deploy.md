@@ -65,6 +65,14 @@ matrix_recording_bot_matrix_pickle_key: "random-secret-for-e2ee-storage"
 
 # Default recording mode (optional, default "screen")
 # matrix_recording_bot_default_mode: "screen"
+
+# Nextcloud integration (optional)
+# matrix_recording_bot_nextcloud_enabled: true
+# matrix_recording_bot_nextcloud_url: "https://cloud.example.com"
+# matrix_recording_bot_nextcloud_username: "recording-bot"
+# matrix_recording_bot_nextcloud_password: "app-password"
+# matrix_recording_bot_nextcloud_delete_after_upload: true
+# matrix_recording_bot_nextcloud_retention_days: 30
 ```
 
 Add LiveKit webhook configuration (so LiveKit notifies the bot about call events) and Valkey connectivity:
